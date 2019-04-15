@@ -18,6 +18,9 @@
 #include "phxbinlogsvr/core/gtid_handler.h"
 #include "phxbinlogsvr/define/errordef.h"
 
+#include "rocksdb/slice.h"
+#include "rocksdb/status.h"
+
 using std::string;
 using phxsql::LogVerbose;
 using phxsql::ColorLogInfo;
@@ -66,10 +69,10 @@ string EventUUIDHandler::GetGTIDKeyForLastRead() {
 int EventUUIDHandler::InitUUIDHandler() {
     EventDataInfoList list;
     int ret = FILE_FAIL;
-    event_index_status status = event_index_->GetGTID(GetKeyForUUID(), &list);
-    if (status == event_index_status::DATA_NOT_FOUND) {
+    rocksdb::Status s = event_index_->GetGTID(GetKeyForUUID(), &list);
+    if (s.IsNotFound()) {
         ret = OK;
-    } else if (status == event_index_status::OK) {
+    } else if (s.ok()) {
         ret = ParseFromEventInfoList(list);
     } else {
         ret = FILE_FAIL;
@@ -223,8 +226,8 @@ int EventUUIDHandler::FlushEventUUIDInfo(EventDataInfoList *list) {
         return OK;
     }
 
-    event_index_status status = event_index_->SetGTIDIndex(GetKeyForUUID(), *list);
-    if (status != event_index_status::OK) {
+    rocksdb::Status s = event_index_->SetGTIDIndex(GetKeyForUUID(), *list);
+    if (!s.ok()) {
         return FILE_FAIL;
     }
     ColorLogInfo("%s flush list %zu", __func__, list->info_list_size());

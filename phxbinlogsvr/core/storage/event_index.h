@@ -10,56 +10,63 @@
 
 #pragma once
 
-#include "leveldb/db.h"
-#include "leveldb/comparator.h"
+#include "rocksdb/db.h"
+#include "rocksdb/comparator.h"
+#include "rocksdb/slice.h"
 #include "eventdata.pb.h"
 
+using rocksdb::Status;
 namespace phxbinlog {
 
-enum class event_index_status {
-    DB_ERROR = -1,
-    OK = 0,
-    DATA_NOT_FOUND = 1,
-    DATA_ERROR = 2,
+class ScopeSnapshot {
+  public:
+    ScopeSnapshot(rocksdb::DB* db, const rocksdb::Snapshot** snapshot) :
+      db_(db), snapshot_(snapshot) {
+        *snapshot_ = db_->GetSnapshot();
+
+      }
+    ~ScopeSnapshot() {
+      db_->ReleaseSnapshot(*snapshot_);
+
+    }
+  private:
+    rocksdb::DB* const db_;
+    const rocksdb::Snapshot** snapshot_;
+    ScopeSnapshot(const ScopeSnapshot&);
+    void operator=(const ScopeSnapshot&);
 };
 
-class EventComparator : public leveldb::Comparator {
- public:
-    int Compare(const leveldb::Slice &a, const leveldb::Slice &b) const;
-
-    const char *Name() const {
-        return "EventComparator";
+class EventComparatorImpl : public rocksdb::Comparator {
+  public: 
+    const char *Name() const override {
+      return "phxbinlogsrv.EventComparatorImpl";
+    } 
+    int Compare(const rocksdb::Slice &a, const rocksdb::Slice &b) const override; 
+    void FindShortestSeparator(std::string *, const rocksdb::Slice &) const {
     }
-
-    void FindShortestSeparator(std::string *, const leveldb::Slice &) const {
-    }
-
     void FindShortSuccessor(std::string *) const {
     }
 };
 
 class EventIndex {
- public:
+  public:
     EventIndex(const std::string &event_path);
     ~EventIndex();
 
-    event_index_status GetGTID(const std::string &gtid, ::google::protobuf::Message *data_info);
-    event_index_status GetLowerBoundGTID(const std::string &gtid, ::google::protobuf::Message *data_info);
+    Status GetGTID(const std::string &gtid, ::google::protobuf::Message *data_info);
+    Status GetLowerBoundGTID(const std::string &gtid, ::google::protobuf::Message *data_info);
 
-    event_index_status SetGTIDIndex(const std::string &gtid, const ::google::protobuf::Message &data_info);
-    event_index_status DeleteGTIDIndex(const std::string &gtid);
-    event_index_status IsExist(const std::string &gtid);
+    Status SetGTIDIndex(const std::string &gtid, const ::google::protobuf::Message &data_info);
+    Status DeleteGTIDIndex(const std::string &gtid);
+    Status IsExist(const std::string &gtid);
 
- private:
+  private:
     void CloseDB();
-    void OpenDB(const std::string &event_path);
-
-    event_index_status GetGTIDIndex(const std::string &gtid, ::google::protobuf::Message *data_info,
-                                    bool lower_bound);
-
- private:
-    leveldb::DB *level_db_;
-    EventComparator comparator_;
+    Status OpenDB(const std::string &event_path);
+    Status GetGTIDIndex(const std::string &gtid, ::google::protobuf::Message *data_info,
+        bool lower_bound);
+  private:
+    rocksdb::DB *db_;
 };
 
 }

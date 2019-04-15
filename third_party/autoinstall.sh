@@ -46,9 +46,9 @@ function check_lib_exist()
     return $?
 }
 
-function install_leveldb()
+function install_rocksdb()
 {
-    lib_name="leveldb";
+    lib_name="rocksdb";
     check_dir_exist $lib_name;
 
     # check if aready install.
@@ -57,18 +57,14 @@ function install_leveldb()
         psucc "$lib_name already installed."
         return;
     fi
-    # end check.
-
     go_back;
     cd $lib_name;
-    make;
-    if [ ! -d lib ]; then
-        mkdir lib;
-    fi
-    cd lib;
-    if [ ! -f libleveldb.a ]; then
-        ln -s ../out-static/libleveldb.a libleveldb.a
-    fi
+    # end check.
+    if [ -f librocksdb.a ]; then
+      return 1;
+    fi    
+    make release;
+    
 
     check_lib_exist $lib_name;
     if [ $? -eq 1 ]; then
@@ -293,7 +289,7 @@ function install_phxrpc()
 
 install_gflags;
 install_glog;
-install_leveldb;
+install_rocksdb;
 install_protobuf;
 install_colib;
 install_phxpaxos;
